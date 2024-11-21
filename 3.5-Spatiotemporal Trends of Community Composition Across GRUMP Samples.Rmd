@@ -1,0 +1,653 @@
+---
+title: "3.5 - Spatiotemporal Trends of Community Composition Across GRUMP Samples"
+author: "Nathan WIlliams"
+date: "2024-11-21"
+output: html_document
+---
+
+```{r Load Dependencies}
+library(tidyverse)
+library(patchwork)
+library(knitr)
+library(ggpubr)
+library(vegan)
+library(pairwiseAdonis)
+library(kableExtra)
+```
+
+```{r Import Data}
+setwd("~/Dropbox/USC/Projects/grump.data/04-Data/version-1.3/")
+grump_asv_long <- read_csv("grump_asv_long_version-1.3.1.csv")
+```
+
+```{r Grump Taxonomy}
+grump_taxonomy <- grump_asv_long %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>% distinct(ASV, .keep_all = TRUE)
+```
+
+```{r, echo=FALSE, fig1, fig.height = 10, fig.width = 15}
+# Plot 1: Pie Chart of reads by Ocean Basin
+pie.database <- grump_asv_long %>%
+  group_by(Ocean.Basin) %>%
+  summarise(Total.Reads = sum(Corrected_Sequence_Counts), .groups = 'drop') %>%
+  mutate(Total = sum(Total.Reads),
+         Total.Percent = (Total.Reads / Total) * 100)
+
+pie.database$Total.Percent <- round(pie.database$Total.Percent, 1)
+
+pie_chart <- ggplot(pie.database, aes(x = "", y = Total.Percent, fill = Ocean.Basin)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = paste0(Total.Percent, "%")), position = position_stack(vjust = 0.5)) +
+  labs(title = "A) Total Reads by Ocean Basin") +
+  scale_fill_brewer(palette = "Set3") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  guides(fill = guide_legend(title = "Ocean Basin", title.position = "top", title.hjust = 0.5))
+
+# Plot 2: Pie Chart of reads by Depth
+pie.database.depth <- grump_asv_long %>%
+  group_by(Depth.Category) %>%
+  summarise(Total.Reads = sum(Corrected_Sequence_Counts), .groups = 'drop') %>%
+  mutate(Total = sum(Total.Reads),
+         Total.Percent = (Total.Reads / Total) * 100)
+
+pie.database.depth$Total.Percent <- round(pie.database.depth$Total.Percent, 1)
+
+pie_chart_depth <- ggplot(pie.database.depth, aes(x = "", y = Total.Percent, fill = Depth.Category)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = paste0(Total.Percent, "%")), position = position_stack(vjust = 0.5)) +
+  labs(title = "B) Total Reads by Depth") +
+  scale_fill_brewer(palette = "Set3") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  guides(fill = guide_legend(title = "Depth Category", title.position = "top", title.hjust = 0.5))
+
+# Plot 3: Pie Chart of samples by Ocean Basin
+pie.samples <- grump_asv_long %>%
+  group_by(Ocean.Basin) %>%
+  summarise(Total.Samples = n_distinct(SampleID), .groups = 'drop') %>%
+  mutate(Total = sum(Total.Samples),
+         Total.Percent = (Total.Samples / Total) * 100)
+
+pie.samples$Total.Percent <- round(pie.samples$Total.Percent, 1)
+
+pie_chart_samples <- ggplot(pie.samples, aes(x = "", y = Total.Percent, fill = Ocean.Basin)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = paste0(Total.Percent, "%")), position = position_stack(vjust = 0.5)) +
+  labs(title = "C) Total Samples by Ocean Basin") +
+  scale_fill_brewer(palette = "Set3") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  guides(fill = guide_legend(title = "Ocean Basin", title.position = "top", title.hjust = 0.5))
+
+# Plot 4: Pie Chart of samples by Depth
+pie.samples.depth <- grump_asv_long %>%
+  group_by(Depth.Category) %>%
+  summarise(Total.Samples = n_distinct(SampleID), .groups = 'drop') %>%
+  mutate(Total = sum(Total.Samples),
+         Total.Percent = (Total.Samples / Total) * 100)
+
+pie.samples.depth$Total.Percent <- round(pie.samples.depth$Total.Percent, 1)
+
+pie_chart_samples_depth <- ggplot(pie.samples.depth, aes(x = "", y = Total.Percent, fill = Depth.Category)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = paste0(Total.Percent, "%")), position = position_stack(vjust = 0.5)) +
+  labs(title = "D) Total Samples by Depth") +
+  scale_fill_brewer(palette = "Set3") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  guides(fill = guide_legend(title = "Depth Category", title.position = "top", title.hjust = 0.5))
+
+# Combine the plots in a 2x2 grid with the legend on the right
+combined_plot <- (pie_chart | pie_chart_depth | plot_spacer()) / (pie_chart_samples | pie_chart_samples_depth | plot_spacer()) +
+  plot_layout(guides = 'collect') & theme(legend.position = 'right', legend.box = "vertical")
+
+# Print the combined plot
+print(combined_plot)
+
+# Print the tables
+cat("Table 1: Total Reads and Percentages by Ocean Basin\n")
+print(pie.database)
+
+cat("Table 2: Total Reads and Percentages by Depth Category\n")
+print(pie.database.depth)
+
+cat("Table 3: Total Samples and Percentages by Ocean Basin\n")
+print(pie.samples)
+
+cat("Table 4: Total Samples and Percentages by Depth Category\n")
+print(pie.samples.depth)
+
+# Set directory and save the combined plot
+#setwd("~/Dropbox/USC/Projects/grump.data/02-Figures")
+#ggsave("Combined_GRUMP_Pie_Charts_with_Samples_Legend_Right.pdf", plot = combined_plot, width = 16, height = 8)
+```
+
+```{r Number of ASVs that exist in only one sample}
+# Group by ASV and count the number of unique samples for each ASV
+asv_sample_count <- grump_asv_long %>%
+  group_by(ASV) %>%
+  summarise(Sample_Count = n_distinct(SampleID))
+
+# Filter ASVs that occur in only one sample
+unique_asvs_in_one_sample <- asv_sample_count %>%
+  filter(Sample_Count == 1)
+
+# Calculate the total number of unique ASVs
+total_unique_asvs <- nrow(asv_sample_count)
+
+# Calculate the percentage of ASVs found in only one sample
+percentage_single_sample_asvs <- (nrow(unique_asvs_in_one_sample) / total_unique_asvs) * 100
+
+# Print the results
+print(paste("Number of ASVs that exist in only one sample:", nrow(unique_asvs_in_one_sample)))
+print(paste("Total number of unique ASVs:", total_unique_asvs))
+print(paste("Percentage of ASVs that exist in only one sample:", round(percentage_single_sample_asvs, 2), "%"))
+```
+
+```{r Percentage of ASVs that exist in all samples}
+# Group by ASV and count the number of unique samples for each ASV
+asv_sample_count <- grump_asv_long %>%
+  group_by(ASV) %>%
+  summarise(Sample_Count = n_distinct(SampleID))
+
+# Determine the total number of unique samples
+total_samples <- n_distinct(grump_asv_long$SampleID)
+
+# Filter ASVs that appear in all samples
+asvs_in_all_samples <- asv_sample_count %>%
+  filter(Sample_Count == total_samples)
+
+# Calculate the percentage of ASVs found in all samples
+percentage_all_samples_asvs <- (nrow(asvs_in_all_samples) / nrow(asv_sample_count)) * 100
+
+# Print the results
+print(paste("Number of ASVs that exist in all samples:", nrow(asvs_in_all_samples)))
+print(paste("Total number of unique ASVs:", nrow(asv_sample_count)))
+print(paste("Percentage of ASVs that exist in all samples:", round(percentage_all_samples_asvs, 2), "%"))
+print("Here are some examples of ASVs found in all samples:")
+```
+
+```{r Number of ASVs that are detected within all Ocean Basin}
+# Assuming 'Ocean.Basin' is a column in your dataframe that denotes the basin for each sample
+
+# Group by ASV and Ocean.Basin, then count unique Ocean Basins per ASV
+asv_basin_count <- grump_asv_long %>%
+  group_by(ASV) %>%
+  summarise(Ocean_Basins = n_distinct(Ocean.Basin))
+
+# Determine the total number of unique Ocean Basins
+total_ocean_basins <- n_distinct(grump_asv_long$Ocean.Basin)
+
+# Filter ASVs that appear in all Ocean Basins
+asvs_in_all_basins <- asv_basin_count %>%
+  filter(Ocean_Basins == total_ocean_basins)
+
+# Calculate the percentage of ASVs found in all Ocean Basins
+percentage_all_basins_asvs <- (nrow(asvs_in_all_basins) / nrow(asv_basin_count)) * 100
+
+# Print the results
+print(paste("Number of ASVs present in every Ocean Basin:", nrow(asvs_in_all_basins)))
+print(paste("Percentage of ASVs present in every Ocean Basin:", round(percentage_all_basins_asvs, 2), "%"))
+```
+
+```{r Top ASVs which are detected in all five oceans}
+# Group by ASV and Ocean.Basin, then count unique Ocean Basins per ASV
+asv_basin_count <- grump_asv_long %>%
+  group_by(ASV) %>%
+  summarise(Ocean_Basins = n_distinct(Ocean.Basin), .groups = 'drop')
+
+# Determine the total number of unique Ocean Basins
+total_ocean_basins <- n_distinct(grump_asv_long$Ocean.Basin)
+
+# Filter ASVs that appear in all Ocean Basins
+asvs_in_all_basins <- asv_basin_count %>%
+  filter(Ocean_Basins == total_ocean_basins) %>%
+  pull(ASV)  # Get a vector of ASVs
+
+# Calculate the total abundance of each ASV across all samples, only for those ASVs in all basins
+asv_abundance_totals <- grump_asv_long %>%
+  filter(ASV %in% asvs_in_all_basins) %>%
+  group_by(ASV) %>%
+  summarise(Total_Abundance = sum(Relative_Abundance), .groups = 'drop') %>%
+  arrange(desc(Total_Abundance))
+
+# Get the top 10 most abundant ASVs from this filtered list
+top_10_asvs_in_all_basins <- head(asv_abundance_totals, 10)
+
+# Optionally, join back to grump_taxonomy to retrieve taxonomic information for these top 10 ASVs
+top_10_asvs_with_taxonomy <- grump_taxonomy %>%
+  filter(ASV %in% top_10_asvs_in_all_basins$ASV) %>%
+  arrange(match(ASV, top_10_asvs_in_all_basins$ASV))  # Preserve order of abundance
+```
+
+```{r message = FALSE, warning = FALSE}
+# Print the results
+print("Top 10 most abundant ASVs that are present in all five oceans with their taxonomy:") 
+ # Print the result for this specific Ocean Basin
+  kbl(top_10_asvs_with_taxonomy) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+
+```
+
+```{r ASVs that are unique to each single Ocean Basin}
+library(dplyr)
+
+# Assuming your dataframe is named grump_asv_long and has a column named 'Ocean.Basin'
+
+# Group by ASV and count unique samples per ASV per Ocean Basin
+asv_per_basin <- grump_asv_long %>%
+  group_by(ASV, Ocean.Basin) %>%
+  summarise(Sample_Count = n_distinct(SampleID), .groups = "drop")
+
+# Self join to find ASVs that are only present in one Ocean Basin
+asvs_unique_to_one_basin <- asv_per_basin %>%
+  group_by(ASV) %>%
+  filter(n() == 1) %>%
+  ungroup() %>%
+  distinct(ASV, Ocean.Basin) %>%
+  arrange(Ocean.Basin, ASV)
+
+# Calculate total number of unique ASVs
+total_unique_asvs <- n_distinct(grump_asv_long$ASV)
+
+# Print results by each Ocean Basin
+unique_basins <- unique(asvs_unique_to_one_basin$Ocean.Basin)
+print("Percentage of ASVs unique to each Ocean Basin relative to total unique ASVs:")
+for(basin in unique_basins) {
+  specific_basin_asvs <- filter(asvs_unique_to_one_basin, Ocean.Basin == basin)
+  num_unique_basin_asvs <- nrow(specific_basin_asvs)
+  percentage_basin_asvs <- (num_unique_basin_asvs / total_unique_asvs) * 100
+  print(paste("Ocean Basin:", basin))
+  print(paste("Number of unique ASVs:", num_unique_basin_asvs))
+  print(paste("Percentage of unique ASVs in this basin:", round(percentage_basin_asvs, 2), "%"))
+  print("Examples of unique ASVs:")
+}
+```
+
+```{r The most abundant unique ASVs}
+# Assuming grump_asv_long has columns 'ASV', 'Ocean.Basin', and 'Relative_Abundance'
+# First, calculate the total relative abundance for each ASV within each Ocean Basin
+asv_abundance_per_basin <- grump_asv_long %>%
+  group_by(Ocean.Basin, ASV) %>%
+  summarise(Total_Abundance = sum(Relative_Abundance), .groups = 'drop')
+
+# Now, for each Ocean Basin, rank the ASVs by their total relative abundance and select the top 10
+unique_oceans <- unique(asv_abundance_per_basin$Ocean.Basin)
+
+for (ocean in unique_oceans) {
+  top_asvs <- asv_abundance_per_basin %>%
+    filter(Ocean.Basin == ocean) %>%
+    arrange(desc(Total_Abundance)) %>%
+    slice_max(order_by = Total_Abundance, n = 10)
+  
+  # Optionally, include taxonomic information if available
+  if (exists("grump_taxonomy")) {
+    top_asvs <- top_asvs %>%
+      left_join(grump_taxonomy, by = "ASV")
+  }}
+```
+
+```{r message = FALSE, warning = FALSE}
+#Print results
+  kbl(top_asvs) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+```{r }
+#Make Taxonomy table
+grump_taxonomy <- grump_asv_long %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>% distinct(ASV, .keep_all = TRUE)
+```
+
+```{r }
+# Define custom colors for Longhurst provinces
+longhurst_colours <- c("Polar - Boreal Polar Province (POLR)"="#fe0080", 
+                       "Polar - N. Pacific Epicontinental Province"="#ffcbd7", 
+                       "Westerlies - Pacific Subarctic Gyres Province (East)"="#6e000b", 
+                       "Coastal - NW Atlantic Shelves Province"="#f75a00", 
+                       "Westerlies - Gulf Stream Province"="#734900", 
+                       "Westerlies - N. Atlantic Subtropical Gyral Province (East) (STGE)"="#ffc274", 
+                       "Westerlies - N. Pacific Polar Front Province"="#ffe1a4", 
+                       "Westerlies - N. Atlantic Subtropical Gyral Province (West) (STGW)"="#b49200", 
+                       "Trades - N. Pacific Tropical Gyre Province"="#cebd00", 
+                       "Trades - N. Atlantic Tropical Gyral Province (TRPG)"="#688900", 
+                       "Coastal - E. India Coastal Province"="#8ffd32", 
+                       "Trades - Western Tropical Atlantic Province"="#cfffa6", 
+                       "Trades - N. Pacific Equatorial Countercurrent Province"="#0d1c00", 
+                       "Trades - Pacific Equatorial Divergence Province"="#005d07", 
+                       "Trades - South Atlantic Gyral Province (SATG)"="#7fffae", 
+                       "Westerlies - S. Pacific Subtropical Gyre Province"="#00af64", 
+                       "Trades - Indian Monsoon Gyres Province"="#007859", 
+                       "Trades - Archipelagic Deep Basins Province"="#c5fcff", 
+                       "Coastal - East Australian Coastal Province"="#004a4f", 
+                       "Coastal - E. Africa Coastal Province"="#01b0be", 
+                       "Coastal - Benguela Current Coastal Province"="#0058b3", 
+                       "Trades - Indian S. Subtropical Gyre Province"="#b8aeff", 
+                       "Westerlies - S. Subtropical Convergence Province"="#21003f", 
+                       "Coastal - New Zealand Coastal Province"="#eac7ff", 
+                       "Coastal - SW Atlantic Shelves Province"="#7b00a5", 
+                       "Westerlies - Subantarctic Province"="#d95dff", 
+                       "Polar - Antarctic Province"="#630037", 
+                       "Polar - Austral Polar Province"="#ff8fb9")
+
+ordered_longhurst_provinces <- rev(c("Polar - Boreal Polar Province (POLR)", "Polar - N. Pacific Epicontinental Province", "Westerlies - Pacific Subarctic Gyres Province (East)", "Coastal - NW Atlantic Shelves Province", "Westerlies - Gulf Stream Province", "Westerlies - N. Atlantic Subtropical Gyral Province (East) (STGE)", "Westerlies - N. Pacific Polar Front Province", "Westerlies - N. Atlantic Subtropical Gyral Province (West) (STGW)", "Trades - N. Pacific Tropical Gyre Province", "Trades - N. Atlantic Tropical Gyral Province (TRPG)", "Coastal - E. India Coastal Province", "Trades - Western Tropical Atlantic Province", "Trades - N. Pacific Equatorial Countercurrent Province", "Trades - Pacific Equatorial Divergence Province", "Trades - South Atlantic Gyral Province (SATG)", "Westerlies - S. Pacific Subtropical Gyre Province", "Trades - Indian Monsoon Gyres Province", "Trades - Archipelagic Deep Basins Province", "Coastal - East Australian Coastal Province", "Coastal - E. Africa Coastal Province", "Coastal - Benguela Current Coastal Province", "Trades - Indian S. Subtropical Gyre Province", "Westerlies - S. Subtropical Convergence Province", "Coastal - New Zealand Coastal Province",
+"Coastal - SW Atlantic Shelves Province", "Westerlies - Subantarctic Province", "Polar - Antarctic Province", "Polar - Austral Polar Province"))
+```
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Pull out the top 50m
+Top50m_grump <- grump_asv_long %>% filter(Depth < 50)
+```
+
+Average by grouping by station, Cruise_ID, and Level_1.1. For this script Level_1.1 will be abbreviated to Level_1.1.
+
+Average by grouping by station, Cruise_ID, and Level_1.1.
+
+TS = Total Species at site
+TP = total sum of the populations
+Ara = Average Relative_Abundance of Level_1.1 at this particular pre-defined depth
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Calculate Relative_Abundance for the Level_1.1 category
+Level_1.1.Surface      <- Top50m_grump %>% select("Cruise_ID", "Station", "Date", "Latitude", "Longitude","ASV_hash", "Level_1.1","Corrected_Sequence_Counts")
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Level_1.1,Date) %>% mutate(ASC = mean(Corrected_Sequence_Counts))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Level_1.1,Date) %>% mutate(TS = sum(ASC))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date) %>% mutate(TP = sum(ASC))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date,Level_1.1) %>% mutate(Level_1.1.Surface_ra = (TS/TP)*100)
+Level_1.1.Surface      <- Level_1.1.Surface   %>% unite("Distinct.var",Cruise_ID,Station,Date,Level_1.1, remove = FALSE) %>% distinct(Distinct.var, .keep_all = TRUE)
+#Level_1.1.Surface[is.na(Level_1.1.Surface)] <- 0
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date) %>% mutate(Check.Total = sum(Level_1.1.Surface_ra))
+```
+
+Surface only zoomed in for 3 major transects.
+
+Make the three bar graphs.
+
+Make the colours and the order of sequence type
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Seqeuence Type colour and order
+bar_width <- 0.75
+text_size <- 18
+axis_text_angle <- 90
+
+# Colours and order for Level_1.1
+Level_1.1.order <- c("Archaea", "Bacteria", "Cyanobacteria", "Chloroplast_16S", "Eukaryote_18S")
+Level_1.1.colours <- c("Archaea" = "#e32d24", "Eukaryote_18S" = "#009b80", "Bacteria" = "#aaa4d8", "Chloroplast_16S" = "#a8cb40", "Cyanobacteria" = "#ffc544")
+```
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Functions
+
+# Function to calculate relative abundance for a given depth category
+calculate_relative_abundance_depth <- function(data, depth_category) {
+  data %>% 
+    filter(Depth.Category %in% depth_category) %>% 
+    select("Cruise_ID", "Station", "Date", "Latitude", "Longitude", "ASV_hash", "Level_1.1", "Corrected_Sequence_Counts","Ocean.Basin", "Longhurst_Long","Depth","Depth.Category") %>% 
+    group_by(Cruise_ID, Station, Level_1.1, Date) %>% 
+    mutate(ASC = mean(Corrected_Sequence_Counts),
+           TS = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(TP = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date, Level_1.1) %>% 
+    mutate(Level_1.1.ra = (TS / TP) * 100) %>% 
+    unite("Distinct.var", Cruise_ID, Station, Date, Level_1.1, remove = FALSE) %>% 
+    distinct(Distinct.var, .keep_all = TRUE) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(Check.Total = sum(Level_1.1.ra))
+}
+
+# Function to calculate relative abundance for a given depth category
+calculate_relative_abundance <- function(data) {
+  data %>% 
+    select("Cruise_ID", "Station", "Date", "Latitude", "Longitude", "ASV_hash", "Level_1.1", "Corrected_Sequence_Counts","Ocean.Basin", "Longhurst_Long","Depth", "Depth.Category") %>% 
+    group_by(Cruise_ID, Station, Level_1.1, Date) %>% 
+    mutate(ASC = mean(Corrected_Sequence_Counts),
+           TS = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(TP = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date, Level_1.1) %>% 
+    mutate(Level_1.1.ra = (TS / TP) * 100) %>% 
+    unite("Distinct.var", Cruise_ID, Station, Date, Level_1.1, remove = FALSE) %>% 
+    distinct(Distinct.var, .keep_all = TRUE) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(Check.Total = sum(Level_1.1.ra))
+}
+
+# Function to plot bar graph
+plot_bar_graph <- function(data, y_label, limits, breaks) {
+  ggplot(data, aes(x = Latitude, y = Level_1.1.ra, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") +
+    guides(fill = guide_legend(ncol = 1)) + 
+    labs(y = y_label, x = "") +
+    scale_x_continuous(limits = limits, breaks = breaks) +
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20)) + 
+    coord_flip()
+}
+
+plot_bar_graph_horizontal <- function(data, x_label, limits, breaks) {
+  # Filter out rows where Level_1.1.ra is zero or missing
+  data_filtered <- data %>% filter(Level_1.1.ra != 0 & !is.na(Level_1.1.ra))
+  
+  ggplot(data_filtered, aes(y = Level_1.1.ra, x = Latitude, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") + 
+    guides(fill = guide_legend(ncol = 1)) +
+    labs(y = x_label, x = "") +  # Notice that x and y labels are flipped
+    scale_x_continuous(limits = limits, breaks = breaks) +  # Notice that limits and breaks apply to x-axis now
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20))
+}
+
+plot_bar_graph_MOSAiC <- function(data, x_label, limits, breaks) {
+  # Filter out rows where Level_1.1.ra is zero or missing
+  data_filtered <- data %>% filter(Level_1.1.ra != 0 & !is.na(Level_1.1.ra))
+  
+  ggplot(data_filtered, aes(y = Level_1.1.ra, x = Longitude, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") + 
+    guides(fill = guide_legend(ncol = 1)) +
+    labs(y = x_label, x = "") +  # Notice that x and y labels are flipped
+    scale_x_continuous(limits = limits, breaks = breaks) +  # Notice that limits and breaks apply to x-axis now
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20))
+}
+
+calculate_summary_stats <- function(data) {
+  data %>%
+    group_by(Level_1.1, Ocean.Basin) %>%
+    summarise(
+      count = n(),
+      mean = round(mean(Level_1.1.ra, na.rm = TRUE), 2),
+      sd = round(sd(Level_1.1.ra, na.rm = TRUE), 2),
+      min = round(min(Level_1.1.ra, na.rm = TRUE), 2),
+      `25%` = round(quantile(Level_1.1.ra, 0.25, na.rm = TRUE), 2),
+      median = round(median(Level_1.1.ra, na.rm = TRUE), 2),
+      `75%` = round(quantile(Level_1.1.ra, 0.75, na.rm = TRUE), 2),
+      max = round(max(Level_1.1.ra, na.rm = TRUE), 2)
+    )
+}
+
+calculate_summary_stats_depths <- function(data) {
+  data %>%
+    group_by(Level_1.1, Ocean.Basin, Depth.Category) %>%
+    summarise(
+      count = n(),
+      mean = round(mean(Level_1.1.ra, na.rm = TRUE), 2),
+      sd = round(sd(Level_1.1.ra, na.rm = TRUE), 2),
+      min = round(min(Level_1.1.ra, na.rm = TRUE), 2),
+      `25%` = round(quantile(Level_1.1.ra, 0.25, na.rm = TRUE), 2),
+      median = round(median(Level_1.1.ra, na.rm = TRUE), 2),
+      `75%` = round(quantile(Level_1.1.ra, 0.75, na.rm = TRUE), 2),
+      max = round(max(Level_1.1.ra, na.rm = TRUE), 2)
+    )
+}
+```
+
+```{r message = FALSE, warning = FALSE}
+#Define Top 50 and Calculate relative abundance
+Top50m_grump <- grump_asv_long %>% filter(Depth < 50)
+Level_1.1.Surface <- calculate_relative_abundance_depth(Top50m_grump, "Depth_0m-200m")
+```
+
+```{r message = FALSE, warning = FALSE}
+#Summary Statistics
+Level_1.1.Surface.summary_stats <- calculate_summary_stats(Level_1.1.Surface)
+kbl(Level_1.1.Surface.summary_stats) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+```{r message = FALSE, warning = FALSE}
+# Pairwise Adonis in top 50m
+Level_1.1.Surface_data <- Level_1.1.Surface %>% rename(Relative_Abundance = Level_1.1.ra) %>% unite("Pairwise.Var", Level_1.1, Ocean.Basin, sep = "_in_")
+# Ensure that the required columns are in the correct format
+Level_1.1.Surface_data$Level_1.1 <- as.factor(Level_1.1.Surface_data$Pairwise.Var)
+Level_1.1.Surface_data$Relative_Abundance <- as.numeric(as.character(Level_1.1.Surface_data$Relative_Abundance))
+
+# Remove rows with NA in the Relative_Abundance, Level_1.1, or Ocean.Basin columns
+Level_1.1.Surface_data <- na.omit(Level_1.1.Surface_data[, c("Relative_Abundance", "Pairwise.Var")])
+
+# Create a distance matrix for the Relative_Abundance
+dist_matrix <- vegdist(Level_1.1.Surface_data$Relative_Abundance, method = "bray")
+
+# Run pairwise adonis
+pairwise_results <- pairwise.adonis(dist_matrix, Level_1.1.Surface_data$Pairwise.Var)
+
+# Print results
+kbl(pairwise_results) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+```{r Generate plots, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+Level_1.1.GA02 <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("GA02","GA03","AMT-19","AMT-20")) %>% filter(!Station == "Station_9")
+Level_1.1.P16SP16N <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("P16S","P16N","POTATOE"))
+Level_1.1.I8S_I9N <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("I8S", "I9N"))
+
+Level_1.1.GA02_sbg <- plot_bar_graph(Level_1.1.GA02, "Atlantic Ocean - GA02 GA03 AMT19 AMT20", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1.P16SP16N_sbg <- plot_bar_graph(Level_1.1.P16SP16N, "Pacific Ocean - P16N P16S P15S POTATOE", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1.I8S_I9N_sbg <- plot_bar_graph(Level_1.1.I8S_I9N, "Indian Ocean - IO8S IO9N", c(-45, 45), seq(-45, 45, by = 10))
+
+Level_1.1.MOSAiC <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("MOSAiC"))
+Level_1.1.MOSAiC_sbg <- plot_bar_graph_MOSAiC(Level_1.1.MOSAiC, "MOSAiC", c(-10, 120), seq(-10, 120, by = 10))
+Level_1.1.MOSAiC_sbg
+
+Top_50m_Three_Oceans <- ggarrange(Level_1.1.P16SP16N_sbg, Level_1.1.GA02_sbg, Level_1.1.I8S_I9N_sbg, ncol = 3, nrow = 1, common.legend = TRUE, legend = "right")
+Top_50m_Three_Oceans
+
+Southern_Ocean_P15S <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("P15S"))
+Southern_Ocean_I8S <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("I8S"))
+Southern_Ocean_IND_2017 <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("IND_2017"))
+
+Southern_Ocean_P15S_sbg <- plot_bar_graph(Southern_Ocean_P15S, "Southern Ocean P15S", c(-70, -45), seq(-70, -45, by = 10))
+Southern_Ocean_I8S_sbg <- plot_bar_graph(Southern_Ocean_I8S, "Southern Ocean I8S", c(-70, -45), seq(-70, -45, by = 10))
+Southern_Ocean_IND_2017_sbg <- plot_bar_graph(Southern_Ocean_IND_2017, "Southern Ocean IND 2017", c(-70, -45), seq(-70, -45, by = 10))
+
+Southern_Ocean_P15S_sbg
+Southern_Ocean_I8S_sbg
+Southern_Ocean_IND_2017_sbg
+```
+
+```{r message = FALSE, warning = FALSE}
+#Summary Statistics Depth 0-200m
+Level_1.1.D0m_D200m <- calculate_relative_abundance_depth(grump_asv_long, "Depth_0m-200m")
+Level_1.1.D200m_D1000m <- calculate_relative_abundance_depth(grump_asv_long, "Depth_200m-1000m")
+Level_1.1.D_Below_1000m <- calculate_relative_abundance_depth(grump_asv_long, "Depth_>1000m")
+
+#Make the stats tables
+Level_1.1.D0m_D200m.summary_stats <- calculate_summary_stats_depths(Level_1.1.D0m_D200m)
+Level_1.1.D200m_D1000m.summary_stats <- calculate_summary_stats_depths(Level_1.1.D200m_D1000m)
+Level_1.1.D_Below_1000m.summary_stats <- calculate_summary_stats_depths(Level_1.1.D_Below_1000m)
+
+
+# Combine the three tables
+Level_1.1.Depth.summary_stats <- bind_rows(
+  Level_1.1.D0m_D200m.summary_stats,
+  Level_1.1.D200m_D1000m.summary_stats,
+  Level_1.1.D_Below_1000m.summary_stats
+)
+
+# Display the combined table with kable
+kbl(Level_1.1.Depth.summary_stats) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>%
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+  
+
+```{r message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+#Depth Plots for the Pacific Ocean
+Level_1.1_P16NS_D0m_D200m <- Level_1.1.D0m_D200m %>% filter(Cruise_ID %in% c("P16N", "P16S"))
+Level_1.1_P16NS_D200m_D1000 <- Level_1.1.D200m_D1000m %>% filter(Cruise_ID %in% c("P16N", "P16S"))
+Level_1.1_P16NS_D_Below_1000m <- Level_1.1.D_Below_1000m %>% filter(Cruise_ID %in% c("P16N", "P16S"))
+
+Level_1.1_P16NS_D0m_D200m_sbg <- plot_bar_graph_horizontal(Level_1.1_P16NS_D0m_D200m, "P16NS_D0m_D200m", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_P16NS_D200m_D1000_sbg <- plot_bar_graph_horizontal(Level_1.1_P16NS_D200m_D1000, "P16NS_D200m_D1000", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_P16NS_D_Below_1000m_sbg <- plot_bar_graph_horizontal(Level_1.1_P16NS_D_Below_1000m, "P16NS_D_Below_1000m", c(-45, 45), seq(-45, 45, by = 10))
+
+Pacific_Ocean_Depth_Profile <- ggarrange(Level_1.1_P16NS_D0m_D200m_sbg, Level_1.1_P16NS_D200m_D1000_sbg, Level_1.1_P16NS_D_Below_1000m_sbg, ncol = 1, nrow = 3, common.legend = TRUE, legend = "right")
+Pacific_Ocean_Depth_Profile
+#ggsave("Pacific_Ocean_Depth_Profile.pdf", width = 12, height = 5.85)
+```
+
+```{r message = FALSE, warning = FALSE,  fig.width = 12, fig.height = 8}
+#Depth Plots for the Indian Ocean
+Level_1.1_I9N_I8S_D0m_D200m <- Level_1.1.D0m_D200m %>% filter(Cruise_ID %in% c("I9N", "I8S"))
+Level_1.1_I9N_I8S_D200m_D1000 <- Level_1.1.D200m_D1000m %>% filter(Cruise_ID %in% c("I9N", "I8S"))
+Level_1.1_I9N_I8S_D_Below_1000m <- Level_1.1.D_Below_1000m %>% filter(Cruise_ID %in% c("I9N", "I8S"))
+
+Level_1.1_I9N_I8S_D0m_D200m_sbg <- plot_bar_graph_horizontal(Level_1.1_I9N_I8S_D0m_D200m, "I9N.I8S_D0m_D200m", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_I9N_I8S_D200m_D1000_sbg <- plot_bar_graph_horizontal(Level_1.1_I9N_I8S_D200m_D1000, "I9N.I8S_D200m_D1000", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_I9N_I8S_D_Below_1000m_sbg <- plot_bar_graph_horizontal(Level_1.1_I9N_I8S_D_Below_1000m, "I9N.I8S_D_Below.1000m", c(-45, 45), seq(-45, 45, by = 10))
+
+Indian_Ocean_Depth_Profile <- ggarrange(Level_1.1_I9N_I8S_D0m_D200m_sbg, Level_1.1_I9N_I8S_D200m_D1000_sbg, Level_1.1_I9N_I8S_D_Below_1000m_sbg, ncol = 1, nrow = 3, common.legend = TRUE, legend = "right")
+Indian_Ocean_Depth_Profile
+#ggsave("Indian_Ocean_Depth_Profile.pdf", width = 12, height = 5.85)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+# Depth Plots for Atlantic Ocean
+Level_1.1_GA02_D0m_D200m <- Level_1.1.D0m_D200m %>% filter(Cruise_ID == "GA02")
+Level_1.1_GA02_D200m_D1000 <- Level_1.1.D200m_D1000m %>% filter(Cruise_ID == "GA02")
+Level_1.1_GA02_D_Below_1000m <- Level_1.1.D_Below_1000m %>% filter(Cruise_ID == "GA02")
+
+Level_1.1_GA02_D0m_D200m_sbg <- plot_bar_graph_horizontal(Level_1.1_GA02_D0m_D200m, "GA02_D0m_D200m", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_GA02_D200m_D1000_sbg <- plot_bar_graph_horizontal(Level_1.1_GA02_D200m_D1000, "GA02_D200m_D1000", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1_GA02_D_Below_1000m_sbg <- plot_bar_graph_horizontal(Level_1.1_GA02_D_Below_1000m, "GA02_D_Below.1000m", c(-45, 45), seq(-45, 45, by = 10))
+
+Atlantic_Ocean_Depth_Profile <- ggarrange(Level_1.1_GA02_D0m_D200m_sbg, Level_1.1_GA02_D200m_D1000_sbg, Level_1.1_GA02_D_Below_1000m_sbg, ncol = 1, nrow = 3, common.legend = TRUE, legend = "right")
+Atlantic_Ocean_Depth_Profile
+#ggsave("Atlantic_Ocean_Depth_Profile.pdf", width = 12, height = 5.85)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+#Depth Plots for Southern Ocean
+Level_1.1_P15S_D0m_D200m <- Level_1.1.D0m_D200m %>% filter(Cruise_ID == "P15S") %>% filter(!Station == "Station_30")
+Level_1.1_P15S_D200m_D1000 <- Level_1.1.D200m_D1000m %>% filter(Cruise_ID == "P15S")
+Level_1.1_P15S_D_Below_1000m <- Level_1.1.D_Below_1000m %>% filter(Cruise_ID == "P15S") %>% filter(!Station %in% c("Station_12", "Station_11"))
+
+Level_1.1_P15S_D0m_D200m_sbg <- plot_bar_graph_horizontal(Level_1.1_P15S_D0m_D200m, "P15S_D0m_D200m", c(-70, -45), seq(-70, -45, by = 5))
+Level_1.1_P15S_D200m_D1000_sbg <- plot_bar_graph_horizontal(Level_1.1_P15S_D200m_D1000, "P15S_D200m_D1000", c(-70, -45), seq(-70, -45, by = 5))
+Level_1.1_P15S_D_Below_1000m_sbg <- plot_bar_graph_horizontal(Level_1.1_P15S_D_Below_1000m, "P15S_D_Below.1000m", c(-70, -45), seq(-70, -45, by = 5))
+
+Southern_Ocean_Depth_Profile <- ggarrange(Level_1.1_P15S_D0m_D200m_sbg, Level_1.1_P15S_D200m_D1000_sbg, Level_1.1_P15S_D_Below_1000m_sbg, ncol = 1, nrow = 3, common.legend = TRUE, legend = "right")
+Southern_Ocean_Depth_Profile
+#ggsave("Southern_Ocean_Depth_Profile.pdf", width = 12, height = 5.85)
+```

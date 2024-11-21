@@ -1,0 +1,208 @@
+---
+title: "GRUMP Data Release Figure 1"
+author: "Nathan WIlliams"
+date: "2024-11-20"
+output: html_document
+---
+
+```{r Load Dependencies}
+library(tidyverse)
+library(ggpubr)
+library(ggforce)
+```
+
+1. Metadata Overview
+
+Sampling Information: Provide details on sampling locations, dates, and depths. Maps visualizing sampling sites across the oceans can be very illustrative.
+
+```{r Import Data}
+setwd("~/Dropbox/USC/Projects/grump.data/04-Data/version-1.3/")
+grump_asv_long <- read_csv("grump_asv_long_version-1.3.1.csv")
+```
+
+```{r, echo=FALSE, Map, fig.height = 10, fig.width = 15}
+library(ggplot2)
+library(sf)
+library(rnaturalearth) # for ne_countries
+library(dplyr)
+
+# Load your map data
+world <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  st_set_crs(4326)
+
+robinson <- "+proj=robin +lon_0=-130 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+
+world_robinson_90w <- world %>%
+  st_break_antimeridian(lon_0 = -130) %>%
+  st_transform(crs = robinson)
+
+# Sample data for demonstration
+# Replace this with your actual data
+data <- grump_asv_long %>%
+  distinct(SampleID, .keep_all = TRUE) %>%
+  select(SampleID, Cruise_ID, Latitude, Longitude, Season)
+
+# Convert data to sf object
+data_sf <- st_as_sf(data, coords = c("Longitude", "Latitude"), crs = 4326) %>%
+  st_transform(crs = robinson)
+
+# Define your colors
+Cruise.Colors <- c(
+  "I8S" = "#F70B0B", "I9N" = "#d1f08f", "P15S" = "#FFC40C",
+  "P16N" = "#920000", "P16S" = "#F9DD8C", "AMT-19" = "#F37121",
+  "AMT-20" = "#F4B18C", "GA02" = "#0CB5C6", "GA03" = "#5E0B5A",
+  "GA10" = "#C84097", "GP13" = "#75653B", "MOSAiC" = "#008749",
+  "Gradients_2" = "#7BC143", "Gradients_3" = "#004881",
+  "IND_2017" = "#96D5E0", "KAXIS" = "#FFF0CB", "HEOBI" = "#EDB7DC",
+  "POTATOE" = "#F29C4E", "FRAM_STRAIT" = "#a6a0a0"
+)
+
+# Define shapes for seasons
+Season.Shapes <- c("Winter" = 16, "Spring" = 17, "Summer" = 18, "Fall" = 19)
+
+# Plot
+ggplot() +
+  geom_sf(data = world_robinson_90w, fill = "Grey", color = NA) +
+  geom_sf(data = data_sf, aes(color = Cruise_ID, shape = Season), size = 3) +
+  scale_color_manual(values = Cruise.Colors) +
+  scale_shape_manual(values = Season.Shapes) +
+  theme_minimal() +
+  labs(color = "Cruise ID", shape = "Season") +
+  ggtitle("GRUMP Map") +
+  guides(color = guide_legend(override.aes = list(size = 5))) +
+  theme(axis.text.x = element_text(size = 8, color = "black"),
+        axis.text.y = element_text(size = 8, color = "black"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+#setwd("~/Dropbox/USC/Projects/grump.data/02-Figures/")
+#ggsave("GRUMP.Map.3.pdf", width = 11.7, height = 7)
+```
+
+```{r Longhurst Colours}
+longhurst_colours <- c("Polar - Boreal Polar Province (POLR)"="#fe0080", 
+                       "Polar - N. Pacific Epicontinental Province"="#ffcbd7", 
+                       "Westerlies - Pacific Subarctic Gyres Province (East)"="#6e000b", 
+                       "Coastal - NW Atlantic Shelves Province"="#f75a00", 
+                       "Westerlies - Gulf Stream Province"="#734900", 
+                       "Westerlies - N. Atlantic Subtropical Gyral Province (East) (STGE)"="#ffc274", 
+                       "Westerlies - N. Pacific Polar Front Province"="#ffe1a4", 
+                       "Westerlies - N. Atlantic Subtropical Gyral Province (West) (STGW)"="#b49200", 
+                       "Trades - N. Pacific Tropical Gyre Province"="#cebd00", 
+                       "Trades - N. Atlantic Tropical Gyral Province (TRPG)"="#688900", 
+                       "Coastal - E. India Coastal Province"="#8ffd32", 
+                       "Trades - Western Tropical Atlantic Province"="#cfffa6", 
+                       "Trades - N. Pacific Equatorial Countercurrent Province"="#0d1c00", 
+                       "Trades - Pacific Equatorial Divergence Province"="#005d07", 
+                       "Trades - South Atlantic Gyral Province (SATG)"="#7fffae", 
+                       "Westerlies - S. Pacific Subtropical Gyre Province"="#00af64", 
+                       "Trades - Indian Monsoon Gyres Province"="#007859", 
+                       "Trades - Archipelagic Deep Basins Province"="#c5fcff", 
+                       "Coastal - East Australian Coastal Province"="#004a4f", 
+                       "Coastal - E. Africa Coastal Province"="#01b0be", 
+                       "Coastal - Benguela Current Coastal Province"="#0058b3", 
+                       "Trades - Indian S. Subtropical Gyre Province"="#b8aeff", 
+                       "Westerlies - S. Subtropical Convergence Province"="#21003f", 
+                       "Coastal - New Zealand Coastal Province"="#eac7ff", 
+                       "Coastal - SW Atlantic Shelves Province"="#7b00a5", 
+                       "Westerlies - Subantarctic Province"="#d95dff", 
+                       "Polar - Antarctic Province"="#630037", 
+                       "Polar - Austral Polar Province"="#ff8fb9")
+
+longhurst_order <- rev(c("Polar - Boreal Polar Province (POLR)", 
+                         "Polar - N. Pacific Epicontinental Province", 
+                         "Westerlies - Pacific Subarctic Gyres Province (East)", 
+                         "Coastal - NW Atlantic Shelves Province", "Westerlies - Gulf Stream Province", 
+                         "Westerlies - N. Atlantic Subtropical Gyral Province (East) (STGE)", 
+                         "Westerlies - N. Pacific Polar Front Province", 
+                         "Westerlies - N. Atlantic Subtropical Gyral Province (West) (STGW)", 
+                         "Trades - N. Pacific Tropical Gyre Province", 
+                         "Trades - N. Atlantic Tropical Gyral Province (TRPG)", 
+                         "Coastal - E. India Coastal Province", 
+                         "Trades - Western Tropical Atlantic Province", 
+                         "Trades - N. Pacific Equatorial Countercurrent Province", 
+                         "Trades - Pacific Equatorial Divergence Province", 
+                         "Trades - South Atlantic Gyral Province (SATG)", 
+                         "Westerlies - S. Pacific Subtropical Gyre Province", 
+                         "Trades - Indian Monsoon Gyres Province", 
+                         "Trades - Archipelagic Deep Basins Province", 
+                         "Coastal - East Australian Coastal Province", 
+                         "Coastal - E. Africa Coastal Province", 
+                         "Coastal - Benguela Current Coastal Province", 
+                         "Trades - Indian S. Subtropical Gyre Province", 
+                         "Westerlies - S. Subtropical Convergence Province", 
+                         "Coastal - New Zealand Coastal Province",
+                         "Coastal - SW Atlantic Shelves Province", 
+                         "Westerlies - Subantarctic Province", 
+                         "Polar - Antarctic Province", 
+                         "Polar - Austral Polar Province"))
+```
+
+```{r, echo=FALSE, Depth.Profile, fig.height = 10, fig.width = 15}
+# Define the plotting function with legends removed
+plot_depth_profile <- function(data, longhurst_short_filter, title, x_var = "Latitude", y_var = "Depth", y_limits = c(6000, 0), y_breaks = NULL, x_breaks = NULL) {
+  data_filtered <- data %>% filter(Longhurst_Short %in% longhurst_short_filter)
+  
+  plot <- ggplot(data_filtered) +
+    geom_point(aes(x = .data[[x_var]], y = .data[[y_var]], color = Longhurst_Long, fill = Longhurst_Long), shape = 21, size = 4) +
+    scale_y_reverse(limits = y_limits, breaks = y_breaks) +  
+    scale_color_manual(values = longhurst_colours, guide = "none") +  # Remove color legend
+    scale_fill_manual(values = longhurst_colours, guide = "none") +   # Remove fill legend
+    labs(title = title, x = x_var, y = y_var) +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = "none")  # Ensure the legend is removed completely
+  
+  if (!is.null(x_breaks)) {
+    plot <- plot + scale_x_continuous(breaks = x_breaks)
+  }
+  
+  return(plot)
+}
+
+# Sample data selection
+Depth_Data <- grump_asv_long %>% 
+  select(SampleID, Cruise, Latitude, Longitude, Depth, Longhurst_Short, Longhurst_Long, Season) %>% 
+  group_by(Latitude, Longitude, Depth) %>% 
+  distinct(.keep_all = TRUE)
+
+# Define the specific longitudes to display on the x-axis for Arctic
+specific_longitudes <- c(-180, -120, -60, 0, 60, 120, 180)
+
+# Arctic Ocean plots (Longitude on x-axis)
+Arctic_0_200 <- plot_depth_profile(Depth_Data, c("BPLR"), "Arctic Ocean (0-200m)", x_var = "Longitude", y_limits = c(200, 0), y_breaks = c(0, 50, 150, 200), x_breaks = specific_longitudes)
+Arctic_200_6000 <- plot_depth_profile(Depth_Data, c("BPLR"), "Arctic Ocean (200-6000m)", x_var = "Longitude", y_limits = c(6000, 200), y_breaks = c(200, 3000, 6000), x_breaks = specific_longitudes)
+
+# Pacific Ocean plots (Latitude on x-axis)
+Pacific_0_200 <- plot_depth_profile(Depth_Data, c("NPPF", "NPTG", "PNEC", "PEQD", "SPSG", "BERS", "SSTC", "PSAE", "NEWZ", "ARCH", "AUSE"), "Pacific Ocean (0-200m)", x_var = "Latitude", y_limits = c(200, 0), y_breaks = c(0, 50, 150, 200))
+Pacific_200_6000 <- plot_depth_profile(Depth_Data, c("NPPF", "NPTG", "PNEC", "PEQD", "SPSG", "BERS", "SSTC", "PSAE", "NEWZ", "ARCH", "AUSE"), "Pacific Ocean (200-6000m)", x_var = "Latitude", y_limits = c(6000, 200), y_breaks = c(200, 3000, 6000))
+
+# Atlantic Ocean plots (Latitude on x-axis)
+Atlantic_0_200 <- plot_depth_profile(Depth_Data, c("NASE", "NATR", "WTRA", "SATL", "NASW", "FKLD", "GFST", "NWCS"), "Atlantic Ocean (0-200m)", x_var = "Latitude", y_limits = c(200, 0), y_breaks = c(0, 50, 150, 200))
+Atlantic_200_6000 <- plot_depth_profile(Depth_Data, c("NASE", "NATR", "WTRA", "SATL", "NASW", "FKLD", "GFST", "NWCS"), "Atlantic Ocean (200-6000m)", x_var = "Latitude", y_limits = c(6000, 200), y_breaks = c(200, 3000, 6000))
+
+# Indian Ocean plots (Latitude on x-axis)
+Indian_0_200 <- plot_depth_profile(Depth_Data, c("ISSG", "MONS", "INDE"), "Indian Ocean (0-200m)", x_var = "Latitude", y_limits = c(200, 0), y_breaks = c(0, 50, 150, 200))
+Indian_200_6000 <- plot_depth_profile(Depth_Data, c("ISSG", "MONS", "INDE"), "Indian Ocean (200-6000m)", x_var = "Latitude", y_limits = c(6000, 200), y_breaks = c(200, 3000, 6000))
+
+# Southern Ocean plots (Latitude on x-axis)
+Southern_0_200 <- plot_depth_profile(Depth_Data, c("ANTA", "SANT", "APLR"), "Southern Ocean (0-200m)", x_var = "Latitude", y_limits = c(200, 0), y_breaks = c(0, 50, 150, 200))
+Southern_200_6000 <- plot_depth_profile(Depth_Data, c("ANTA", "SANT", "APLR"), "Southern Ocean (200-6000m)", x_var = "Latitude", y_limits = c(6000, 200), y_breaks = c(200, 3000, 6000))
+
+# Arrange all plots for each ocean together in a vertical stack (0-200m and 200-6000m for each ocean)
+Arctic_Depth_Profiles <- ggarrange(Arctic_0_200, Arctic_200_6000, ncol = 1)
+Pacific_Depth_Profiles <- ggarrange(Pacific_0_200, Pacific_200_6000, ncol = 1)
+Atlantic_Depth_Profiles <- ggarrange(Atlantic_0_200, Atlantic_200_6000, ncol = 1)
+Indian_Depth_Profiles <- ggarrange(Indian_0_200, Indian_200_6000, ncol = 1)
+Southern_Depth_Profiles <- ggarrange(Southern_0_200, Southern_200_6000, ncol = 1)
+
+# Combine all oceans together in a single figure
+All_Oceans_Depth_Profiles <- ggarrange(Arctic_Depth_Profiles, Pacific_Depth_Profiles, Atlantic_Depth_Profiles, Indian_Depth_Profiles, Southern_Depth_Profiles, 
+                                       ncol = 5, common.legend = FALSE)
+
+# Display the combined figure
+All_Oceans_Depth_Profiles
+
+# Save the combined figure if necessary
+# ggsave("All_Oceans_Depth_Profiles_No_Legend.pdf", plot = All_Oceans_Depth_Profiles, width = 20, height = 12)
+```

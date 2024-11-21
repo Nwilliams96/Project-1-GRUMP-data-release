@@ -1,0 +1,228 @@
+---
+title: "Figure-5"
+author: "Nathan WIlliams"
+date: "2024-11-21"
+output: html_document
+---
+
+```{r Load Dependencies}
+library(tidyverse)
+library(patchwork)
+library(knitr)
+library(ggpubr)
+library(vegan)
+library(pairwiseAdonis)
+library(kableExtra)
+```
+
+```{r Import Data}
+setwd("~/Dropbox/USC/Projects/grump.data/04-Data/version-1.3/")
+grump_asv_long <- read_csv("grump_asv_long_version-1.3.1.csv")
+```
+
+```{r }
+#Make Taxonomy table
+grump_taxonomy <- grump_asv_long %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>% distinct(ASV, .keep_all = TRUE)
+```
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Pull out the top 50m
+Top50m_grump <- grump_asv_long %>% filter(Depth < 50)
+```
+
+Average by grouping by station, Cruise_ID, and Level_1.1. For this script Level_1.1 will be abbreviated to Level_1.1.
+
+Average by grouping by station, Cruise_ID, and Level_1.1.
+
+TS = Total Species at site
+TP = total sum of the populations
+Ara = Average Relative_Abundance of Level_1.1 at this particular pre-defined depth
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Calculate Relative_Abundance for the Level_1.1 category
+Level_1.1.Surface      <- Top50m_grump %>% select("Cruise_ID", "Station", "Date", "Latitude", "Longitude","ASV_hash", "Level_1.1","Corrected_Sequence_Counts")
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Level_1.1,Date) %>% mutate(ASC = mean(Corrected_Sequence_Counts))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Level_1.1,Date) %>% mutate(TS = sum(ASC))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date) %>% mutate(TP = sum(ASC))
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date,Level_1.1) %>% mutate(Level_1.1.Surface_ra = (TS/TP)*100)
+Level_1.1.Surface      <- Level_1.1.Surface   %>% unite("Distinct.var",Cruise_ID,Station,Date,Level_1.1, remove = FALSE) %>% distinct(Distinct.var, .keep_all = TRUE)
+#Level_1.1.Surface[is.na(Level_1.1.Surface)] <- 0
+Level_1.1.Surface      <- Level_1.1.Surface   %>% group_by(Cruise_ID,Station,Date) %>% mutate(Check.Total = sum(Level_1.1.Surface_ra))
+```
+
+Surface only zoomed in for 3 major transects.
+
+Make the three bar graphs.
+
+Make the colours and the order of sequence type
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Seqeuence Type colour and order
+bar_width <- 0.75
+text_size <- 18
+axis_text_angle <- 90
+
+# Colours and order for Level_1.1
+Level_1.1.order <- c("Archaea", "Bacteria", "Cyanobacteria", "Chloroplast_16S", "Eukaryote_18S")
+Level_1.1.colours <- c("Archaea" = "#e32d24", "Eukaryote_18S" = "#009b80", "Bacteria" = "#aaa4d8", "Chloroplast_16S" = "#a8cb40", "Cyanobacteria" = "#ffc544")
+```
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+#Functions
+
+# Function to calculate relative abundance for a given depth category
+calculate_relative_abundance_depth <- function(data, depth_category) {
+  data %>% 
+    filter(Depth.Category %in% depth_category) %>% 
+    select("Cruise_ID", "Station", "Date", "Latitude", "Longitude", "ASV_hash", "Level_1.1", "Corrected_Sequence_Counts","Ocean.Basin", "Longhurst_Long","Depth","Depth.Category") %>% 
+    group_by(Cruise_ID, Station, Level_1.1, Date) %>% 
+    mutate(ASC = mean(Corrected_Sequence_Counts),
+           TS = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(TP = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date, Level_1.1) %>% 
+    mutate(Level_1.1.ra = (TS / TP) * 100) %>% 
+    unite("Distinct.var", Cruise_ID, Station, Date, Level_1.1, remove = FALSE) %>% 
+    distinct(Distinct.var, .keep_all = TRUE) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(Check.Total = sum(Level_1.1.ra))
+}
+
+# Function to calculate relative abundance for a given depth category
+calculate_relative_abundance <- function(data) {
+  data %>% 
+    select("Cruise_ID", "Station", "Date", "Latitude", "Longitude", "ASV_hash", "Level_1.1", "Corrected_Sequence_Counts","Ocean.Basin", "Longhurst_Long","Depth", "Depth.Category") %>% 
+    group_by(Cruise_ID, Station, Level_1.1, Date) %>% 
+    mutate(ASC = mean(Corrected_Sequence_Counts),
+           TS = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(TP = sum(ASC)) %>% 
+    group_by(Cruise_ID, Station, Date, Level_1.1) %>% 
+    mutate(Level_1.1.ra = (TS / TP) * 100) %>% 
+    unite("Distinct.var", Cruise_ID, Station, Date, Level_1.1, remove = FALSE) %>% 
+    distinct(Distinct.var, .keep_all = TRUE) %>% 
+    group_by(Cruise_ID, Station, Date) %>% 
+    mutate(Check.Total = sum(Level_1.1.ra))
+}
+
+# Function to plot bar graph
+plot_bar_graph <- function(data, y_label, limits, breaks) {
+  ggplot(data, aes(x = Latitude, y = Level_1.1.ra, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") +
+    guides(fill = guide_legend(ncol = 1)) + 
+    labs(y = y_label, x = "") +
+    scale_x_continuous(limits = limits, breaks = breaks) +
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20)) + 
+    coord_flip()
+}
+
+plot_bar_graph_horizontal <- function(data, x_label, limits, breaks) {
+  # Filter out rows where Level_1.1.ra is zero or missing
+  data_filtered <- data %>% filter(Level_1.1.ra != 0 & !is.na(Level_1.1.ra))
+  
+  ggplot(data_filtered, aes(y = Level_1.1.ra, x = Latitude, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") + 
+    guides(fill = guide_legend(ncol = 1)) +
+    labs(y = x_label, x = "") +  # Notice that x and y labels are flipped
+    scale_x_continuous(limits = limits, breaks = breaks) +  # Notice that limits and breaks apply to x-axis now
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20))
+}
+
+plot_bar_graph_MOSAiC <- function(data, x_label, limits, breaks) {
+  # Filter out rows where Level_1.1.ra is zero or missing
+  data_filtered <- data %>% filter(Level_1.1.ra != 0 & !is.na(Level_1.1.ra))
+  
+  ggplot(data_filtered, aes(y = Level_1.1.ra, x = Longitude, fill = factor(Level_1.1, levels = Level_1.1.order))) + 
+    geom_bar(stat = 'identity', colour = "black", size = 0.25, width = bar_width) +
+    theme(legend.position = 'right') + 
+    scale_fill_manual(values = Level_1.1.colours, "Level_1.1") + 
+    guides(fill = guide_legend(ncol = 1)) +
+    labs(y = x_label, x = "") +  # Notice that x and y labels are flipped
+    scale_x_continuous(limits = limits, breaks = breaks) +  # Notice that limits and breaks apply to x-axis now
+    theme_minimal(base_size = 15) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 20)) + 
+    theme(axis.text.y = element_text(size = 20))
+}
+
+calculate_summary_stats <- function(data) {
+  data %>%
+    group_by(Level_1.1, Ocean.Basin) %>%
+    summarise(
+      count = n(),
+      mean = round(mean(Level_1.1.ra, na.rm = TRUE), 2),
+      sd = round(sd(Level_1.1.ra, na.rm = TRUE), 2),
+      min = round(min(Level_1.1.ra, na.rm = TRUE), 2),
+      `25%` = round(quantile(Level_1.1.ra, 0.25, na.rm = TRUE), 2),
+      median = round(median(Level_1.1.ra, na.rm = TRUE), 2),
+      `75%` = round(quantile(Level_1.1.ra, 0.75, na.rm = TRUE), 2),
+      max = round(max(Level_1.1.ra, na.rm = TRUE), 2)
+    )
+}
+
+calculate_summary_stats_depths <- function(data) {
+  data %>%
+    group_by(Level_1.1, Ocean.Basin, Depth.Category) %>%
+    summarise(
+      count = n(),
+      mean = round(mean(Level_1.1.ra, na.rm = TRUE), 2),
+      sd = round(sd(Level_1.1.ra, na.rm = TRUE), 2),
+      min = round(min(Level_1.1.ra, na.rm = TRUE), 2),
+      `25%` = round(quantile(Level_1.1.ra, 0.25, na.rm = TRUE), 2),
+      median = round(median(Level_1.1.ra, na.rm = TRUE), 2),
+      `75%` = round(quantile(Level_1.1.ra, 0.75, na.rm = TRUE), 2),
+      max = round(max(Level_1.1.ra, na.rm = TRUE), 2)
+    )
+}
+```
+
+```{r message = FALSE, warning = FALSE}
+#Define Top 50 and Calculate relative abundance
+Top50m_grump <- grump_asv_long %>% filter(Depth < 50)
+Level_1.1.Surface <- calculate_relative_abundance_depth(Top50m_grump, "Depth_0m-200m")
+```
+
+```{r message = FALSE, warning = FALSE}
+#Summary Statistics
+Level_1.1.Surface.summary_stats <- calculate_summary_stats(Level_1.1.Surface)
+kbl(Level_1.1.Surface.summary_stats) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+```{r Generate plots, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+Level_1.1.GA02 <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("GA02","GA03","AMT-19","AMT-20")) %>% filter(!Station == "Station_9")
+Level_1.1.P16SP16N <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("P16S","P16N","POTATOE"))
+Level_1.1.I8S_I9N <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("I8S", "I9N"))
+
+Level_1.1.GA02_sbg <- plot_bar_graph(Level_1.1.GA02, "Atlantic Ocean - GA02 GA03 AMT19 AMT20", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1.P16SP16N_sbg <- plot_bar_graph(Level_1.1.P16SP16N, "Pacific Ocean - P16N P16S P15S POTATOE", c(-45, 45), seq(-45, 45, by = 10))
+Level_1.1.I8S_I9N_sbg <- plot_bar_graph(Level_1.1.I8S_I9N, "Indian Ocean - IO8S IO9N", c(-45, 45), seq(-45, 45, by = 10))
+
+Level_1.1.MOSAiC <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("MOSAiC"))
+Level_1.1.MOSAiC_sbg <- plot_bar_graph_MOSAiC(Level_1.1.MOSAiC, "MOSAiC", c(-10, 120), seq(-10, 120, by = 10))
+Level_1.1.MOSAiC_sbg
+
+Top_50m_Three_Oceans <- ggarrange(Level_1.1.P16SP16N_sbg, Level_1.1.GA02_sbg, Level_1.1.I8S_I9N_sbg, ncol = 3, nrow = 1, common.legend = TRUE, legend = "right")
+Top_50m_Three_Oceans
+
+Southern_Ocean_P15S <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("P15S"))
+Southern_Ocean_I8S <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("I8S"))
+Southern_Ocean_IND_2017 <- Level_1.1.Surface %>% filter(Cruise_ID %in% c("IND_2017"))
+
+Southern_Ocean_P15S_sbg <- plot_bar_graph(Southern_Ocean_P15S, "Southern Ocean P15S", c(-70, -45), seq(-70, -45, by = 10))
+Southern_Ocean_I8S_sbg <- plot_bar_graph(Southern_Ocean_I8S, "Southern Ocean I8S", c(-70, -45), seq(-70, -45, by = 10))
+Southern_Ocean_IND_2017_sbg <- plot_bar_graph(Southern_Ocean_IND_2017, "Southern Ocean IND 2017", c(-70, -45), seq(-70, -45, by = 10))
+
+Southern_Ocean_P15S_sbg
+Southern_Ocean_I8S_sbg
+Southern_Ocean_IND_2017_sbg
+```
+

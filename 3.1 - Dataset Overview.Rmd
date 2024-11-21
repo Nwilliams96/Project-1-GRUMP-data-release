@@ -1,0 +1,55 @@
+---
+title: "GRUMP_Data_Release_WB1-Metadata_overview"
+output: html_notebook
+---
+
+```{r Load Dependencies}
+library(tidyverse)
+library(ggpubr)
+library(ggforce)
+```
+
+1. Metadata Overview
+
+Sampling Information: Provide details on sampling locations, dates, and depths. Maps visualizing sampling sites across the oceans can be very illustrative.
+
+```{r Import Data}
+setwd("~/Dropbox/USC/Projects/grump.data/04-Data/version-1.3/")
+grump_asv_long <- read_csv("grump_asv_long_version-1.3.1.csv")
+```
+
+```{r Sample count}
+num_unique_sample_ids <- n_distinct(grump_asv_long$SampleID)
+print(paste("Number of unique SampleIDs in the dataset:", num_unique_sample_ids))
+```
+
+```{r Cruise count}
+Cruises <- grump_asv_long %>% distinct(Cruise_ID)
+num_unique_cruises <- Cruises %>% n_distinct(Cruises$Cruise_ID)
+print(paste("Number of unique Cruises in the dataset:", num_unique_cruises))
+```
+
+```{r Longhurst provinces count}
+Longhurst_Provinces <- grump_asv_long %>% distinct(Longhurst_Long)
+num_unique_Longhurst_Provinces <- Longhurst_Provinces %>% n_distinct(Longhurst_Provinces$Longhurst_Long)
+print(paste("Number of unique Longhurst_Provinces in the dataset:", num_unique_Longhurst_Provinces))
+```
+
+```{r Range of depths}
+Depth_Range <- grump_asv_long %>%
+  summarize(
+    min_depth = min(Depth, na.rm = TRUE),
+    max_depth = max(Depth, na.rm = TRUE)) %>%
+print()
+```
+```{r Range of Years}
+Year_Range <- grump_asv_long %>%
+  summarize(
+    earliest_year_2000 = min(Year, na.rm = TRUE),
+    most_recent_year_2000 = max(Year, na.rm = TRUE)) %>%
+print()
+```
+
+
+
+

@@ -1,0 +1,383 @@
+---
+title: "3.4 - Overall Taxonomic Composition of GRUMP Dataset"
+author: "Nathan WIlliams"
+date: "2024-11-20"
+output: html_document
+---
+
+```{r Load Dependencies}
+library(tidyverse)
+library(patchwork)
+library(knitr)
+library(kableExtra)
+```
+
+```{r Import Data}
+setwd("~/Dropbox/USC/Projects/grump.data/04-Data/version-1.3/")
+grump_asv_long <- read_csv("grump_asv_long_version-1.3.1.csv")
+```
+
+```{r Grump Taxonomy}
+grump_taxonomy <- grump_asv_long %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>% distinct(ASV, .keep_all = TRUE)
+```
+
+Paragraph 1 Calculations
+
+```{r Calculate total number of unique ASVs}
+# Assuming 'ASV' is the column that contains ASV identifiers
+unique_asv_count <- grump_asv_long %>%
+  summarize(unique_ASVs = n_distinct(ASV))
+
+print(unique_asv_count)
+
+# Summing the Corrected_Sequence_Counts column
+total_corrected_sequence_counts <- grump_asv_long %>%
+  summarize(total_corrected_sequence_counts = sum(Corrected_Sequence_Counts, na.rm = TRUE)) 
+
+print(total_corrected_sequence_counts)
+
+# Assuming your dataframe is named grump_taxonomy and has columns 'Domain', 'ASV', and 'Relative_Abundance'
+
+# Group by Domain and Count_Level_Eco unique ASVs within each Domain, and sum Relative_Abundance
+asv_domain_Count_Level_Eco <- grump_asv_long %>%
+  group_by(Domain) %>%
+  summarise(
+    Unique_ASVs = n_distinct(ASV),
+    Total_RA = sum(Relative_Abundance),
+    Total_corrected_sequence_counts = sum(Corrected_Sequence_Counts, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  mutate(Total = sum (Total_corrected_sequence_counts))
+
+# Print the results
+kbl(asv_domain_Count_Level_Eco) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  kable_paper() %>%
+  scroll_box(width = "100%")
+```
+
+```{r Number of ASVs that exist in only one sample}
+# Group by ASV and count the number of unique samples for each ASV
+asv_sample_count <- grump_asv_long %>%
+  group_by(ASV) %>%
+  summarise(Sample_Count = n_distinct(SampleID))
+
+# Filter ASVs that occur in only one sample
+unique_asvs_in_one_sample <- asv_sample_count %>%
+  filter(Sample_Count == 1)
+
+# Calculate the total number of unique ASVs
+total_unique_asvs <- nrow(asv_sample_count)
+
+# Calculate the percentage of ASVs found in only one sample
+percentage_single_sample_asvs <- (nrow(unique_asvs_in_one_sample) / total_unique_asvs) * 100
+
+# Print the results
+print(paste("Total number of unique ASVs:", total_unique_asvs))
+print(paste("Number of ASVs that exist in only one sample:", nrow(unique_asvs_in_one_sample)))
+print(paste("Percentage of ASVs that exist in only one sample:", round(percentage_single_sample_asvs, 2), "%"))
+```
+
+Parragraph 2 Calculations
+
+```{r Calculate unique taxonomic groupings} 
+# Summarizing and printing the unique counts for each taxonomic rank
+taxonomy_summary <- grump_asv_long %>%
+  summarize(
+    unique_supergroups = n_distinct(Supergroup, na.rm = TRUE),
+    unique_divisions = n_distinct(Division, na.rm = TRUE),
+    unique_phyla = n_distinct(Phylum, na.rm = TRUE),
+    unique_classes = n_distinct(Class, na.rm = TRUE),
+    unique_orders = n_distinct(Order, na.rm = TRUE),
+    unique_families = n_distinct(Family, na.rm = TRUE),
+    unique_genera = n_distinct(Genus, na.rm = TRUE),
+    unique_species = n_distinct(Species, na.rm = TRUE),
+     unique_ProPortal = n_distinct(ProPortal_ASV_Ecotype, na.rm = TRUE)
+  )
+
+print(taxonomy_summary)
+```
+
+```{r Calculate unique taxonomic groupings for PR2} 
+# Summarizing and printing the unique counts for each taxonomic rank
+PR2_taxonomy_summary <- grump_asv_long %>%
+  filter(Source_database %in% c("PR2")) %>%
+  summarize(
+    unique_supergroups = n_distinct(Supergroup, na.rm = TRUE),
+    unique_divisions = n_distinct(Division, na.rm = TRUE),
+    unique_phyla = n_distinct(Phylum, na.rm = TRUE),
+    unique_classes = n_distinct(Class, na.rm = TRUE),
+    unique_orders = n_distinct(Order, na.rm = TRUE),
+    unique_families = n_distinct(Family, na.rm = TRUE),
+    unique_genera = n_distinct(Genus, na.rm = TRUE),
+    unique_species = n_distinct(Species, na.rm = TRUE),
+     unique_ProPortal = n_distinct(ProPortal_ASV_Ecotype, na.rm = TRUE)
+  )
+
+print(PR2_taxonomy_summary)
+```
+
+```{r Calculate unique taxonomic groupings for SILVA} 
+# Summarizing and printing the unique counts for each taxonomic rank
+SILVA_taxonomy_summary <- grump_asv_long %>%
+  filter(Source_database %in% c("SILVA")) %>%
+  summarize(
+    unique_supergroups = n_distinct(Supergroup, na.rm = TRUE),
+    unique_divisions = n_distinct(Division, na.rm = TRUE),
+    unique_phyla = n_distinct(Phylum, na.rm = TRUE),
+    unique_classes = n_distinct(Class, na.rm = TRUE),
+    unique_orders = n_distinct(Order, na.rm = TRUE),
+    unique_families = n_distinct(Family, na.rm = TRUE),
+    unique_genera = n_distinct(Genus, na.rm = TRUE),
+    unique_species = n_distinct(Species, na.rm = TRUE),
+     unique_ProPortal = n_distinct(ProPortal_ASV_Ecotype, na.rm = TRUE)
+  )
+
+print(SILVA_taxonomy_summary)
+```
+
+Paragraph 3 and 4 calculations
+
+```{r Prokaryote Figure, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+# First, calculate the Count_Level_Eco of ASVs for each combination of Level_2 and Eco_relevant_plank_groups
+Prokaryotes <- grump_asv_long %>% filter(Level_1 %in% ("Prokaryotes"))
+
+# First, calculate the Count_Level_Eco of ASVs for each combination of Level_2 and Eco_relevant_plank_groups
+Prokaryotes_summary_Diversity <- Prokaryotes %>%
+  group_by(Level_2, Eco_relevant_plank_groups) %>%
+  summarise(
+    Count_Level_Eco = n_distinct(ASV_hash),
+    .groups = 'drop'
+  ) %>%
+  left_join(
+    Prokaryotes %>%
+      group_by(Level_2) %>%
+      summarise(
+        Count_Unique_ASV_hash = n_distinct(ASV_hash),
+        .groups = 'drop'
+      ),
+    by = "Level_2"
+  )
+
+# First, calculate the total Relative_Abundance for each combination of Level_2 and Eco_relevant_plank_groups
+Prokaryotes_summary_Abundance <- Prokaryotes %>%
+  group_by(Level_2, Eco_relevant_plank_groups) %>%
+  summarise(Total_Count_Level_Eco = sum(Relative_Abundance, na.rm = TRUE), .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Level_2) %>%
+  mutate(Total_Count_Level_2 = sum(Total_Count_Level_Eco, na.rm = TRUE))
+
+
+# Define specific Level_2 order
+level_2_order <- c("Alphaproteobacteria", "Archaea", "Bacteroidota","Cyanobacteria", "Gammaproteobacteria", "Other_Bacteria")
+
+# Reorder the data frames
+Prokaryotes_summary_Diversity <- Prokaryotes_summary_Diversity %>%
+  mutate(Level_2 = factor(Level_2, levels = level_2_order)) %>%
+  arrange(Level_2)
+
+Prokaryotes_summary_Abundance <- Prokaryotes_summary_Abundance %>%
+  mutate(Level_2 = factor(Level_2, levels = level_2_order)) %>%
+  arrange(Level_2)
+
+# Create the Diversity plot with x-axis labels
+Prokaryotes_Diversity_Stacked_X_Labels <- ggplot(Prokaryotes_summary_Diversity, aes(x = Eco_relevant_plank_groups, y = Count_Level_Eco, fill = Level_2)) +
+  geom_bar(stat = "identity", colour = "black", size = 0.5) +  # Skinnier bars
+  facet_wrap(~ Level_2, scales = "free_x", nrow = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(y = "Total # of ASVs", x = "Ecologically relevant plankton group") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Retain angle and adjust size
+    axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+    axis.title = element_text(size = 12),  # Adjust axis title size
+    strip.text = element_text(size = 12)   # Adjust facet label size
+  )
+
+# Create the Corrected Sequence plot with x-axis labels
+Prokaryotes_Corrected_Sequence_Stacked_X_Labels <- ggplot(Prokaryotes_summary_Abundance, aes(x = Eco_relevant_plank_groups, y = Total_Count_Level_Eco, fill = Level_2)) +
+  geom_bar(stat = "identity", colour = "black", size = 0.5) +  # Skinnier bars
+  facet_wrap(~ Level_2, scales = "free_x", nrow = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(y = "Cumulative Relative Abundance", x = "Ecologically relevant plankton group") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Retain angle and adjust size
+    axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+    axis.title = element_text(size = 12),  # Adjust axis title size
+    strip.text = element_text(size = 12)   # Adjust facet label size
+  )
+
+kbl(Prokaryotes_summary_Diversity) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+
+kbl(Prokaryotes_summary_Abundance) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+Paragrah 4 calcuations
+
+```{r SAR11 investigation}
+SAR11_Clade_I <- grump_asv_long %>% filter(Eco_relevant_plank_groups %in% c("SAR11_Clade_I")) %>% select(Domain, Supergroup, Division, Phylum, Class, Order, Family, Genus, Species, ProPortal_ASV_Ecotype, Sequence_Type, ASV_hash, ASV) %>% distinct(ASV_hash, .keep_all = TRUE)
+
+SAR11_Clade_I_Assignment_Stats  <- SAR11_Clade_I %>%
+  summarise(
+    Total = n(),
+    NA_Count = sum(is.na(Genus)),
+    Not_NA_Count = sum(!is.na(Genus))
+  ) %>%
+  mutate(
+    Percentage_NA = (NA_Count / Total) * 100,
+    Percentage_Not_NA = (Not_NA_Count / Total) * 100
+  ) %>%
+  select(Percentage_NA, Percentage_Not_NA) %>%
+  pivot_longer(cols = everything(), names_to = "Status", values_to = "Percentage")
+
+# Print the results
+print("Percentage of NA to not NA in the Genus column:")
+print(SAR11_Clade_I_Assignment_Stats )
+```
+
+Paragraph 5 and 6 calculations
+
+```{r Eukaryote Figure, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+Eukaryotes <- grump_asv_long %>% filter(Level_1 %in% ("Eukaryotes"))
+
+# First, calculate the Count_Level_Eco of ASVs for each combination of Level_2 and Eco_relevant_plank_groups
+Eukaryotes_summary_Diversity <- Eukaryotes %>%
+  group_by(Level_2, Eco_relevant_plank_groups) %>%
+  summarise(
+    Count_Level_Eco = n_distinct(ASV_hash),
+    .groups = 'drop'
+  ) %>%
+  left_join(
+    Eukaryotes %>%
+      group_by(Level_2) %>%
+      summarise(
+        Count_Unique_ASV_hash = n_distinct(ASV_hash),
+        .groups = 'drop'
+      ),
+    by = "Level_2"
+  )
+
+# First, calculate the total Relative_Abundance for each combination of Level_2 and Eco_relevant_plank_groups
+Eukaryotes_summary_Abundance <- Eukaryotes %>%
+  group_by(Level_2, Eco_relevant_plank_groups) %>%
+  summarise(Total_Count_Level_Eco = sum(Relative_Abundance, na.rm = TRUE), .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Level_2) %>%
+  mutate(Total_Count_Level_2 = sum(Total_Count_Level_Eco, na.rm = TRUE))
+
+# Define specific Level_2 order
+level_2_order <- c("Chloroplast_16S", "Phytoplankton_18S", "Alveolata_Dinophyceae_18S","Other_Alveolata_18S", "Metazoa_18S", "Rhizaria_18S", "Other_Eukaryote_18S")
+
+# Reorder the data frames
+Eukaryotes_summary_Diversity <- Eukaryotes_summary_Diversity %>%
+  mutate(Level_2 = factor(Level_2, levels = level_2_order)) %>%
+  arrange(Level_2)
+
+Eukaryotes_summary_Abundance <- Eukaryotes_summary_Abundance %>%
+  mutate(Level_2 = factor(Level_2, levels = level_2_order)) %>%
+  arrange(Level_2)
+
+# Eukaryote Diversity plot with updated text size and x-axis text angle
+Eukaryote_Diversity_Stacked_X_Labels <- ggplot(Eukaryotes_summary_Diversity, aes(x = Eco_relevant_plank_groups, y = Count_Level_Eco, fill = Level_2)) +
+  geom_bar(stat = "identity", colour = "black", size = 0.5) +  # Skinnier bars
+  facet_wrap(~ Level_2, scales = "free_x", nrow = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(y = "Total # of ASVs", x = "Ecologically relevant plankton group") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Retain angle and adjust size
+    axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+    axis.title = element_text(size = 12),  # Adjust axis title size
+    strip.text = element_text(size = 12)   # Adjust facet label size
+  )
+
+# Create the Corrected Sequence plot with updated text size and x-axis text angle
+Eukaryote_Corrected_Sequence_Stacked_X_Labels <- ggplot(Eukaryotes_summary_Abundance, aes(x = Eco_relevant_plank_groups, y = Total_Count_Level_Eco, fill = Level_2)) +
+  geom_bar(stat = "identity", colour = "black", size = 0.5) +  # Skinnier bars
+  facet_wrap(~ Level_2, scales = "free_x", nrow = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(y = "Cumulative Relative Abundance", x = "Ecologically relevant plankton group") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Retain angle and adjust size
+    axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+    axis.title = element_text(size = 12),  # Adjust axis title size
+    strip.text = element_text(size = 12)   # Adjust facet label size
+  )
+
+kbl(Eukaryotes_summary_Diversity) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+
+kbl(Eukaryotes_summary_Abundance) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "800px")
+```
+
+Paragraph 6 extra Calculations
+
+```{r Arthropoda Investigation}
+Arthropoda <- grump_asv_long %>% filter(Eco_relevant_plank_groups %in% c("Arthropoda"))
+
+Arthropoda_summary <- Arthropoda %>%
+  mutate(FGID = paste(Family, Genus, ASV_hash, sep = "_")) %>%
+  group_by(FGID) %>%
+  summarise(Total_Relative_Abundance = sum(Relative_Abundance, na.rm = TRUE)) %>%
+  arrange(desc(Total_Relative_Abundance))
+print(Arthropoda_summary)
+```
+
+```{r Calculate reads from Maxillopoda}
+#Calculate reads from Maxillopoda
+
+# Calculate the percentage of relative abundance for Family "Maxillopoda"
+maxillopoda_abundance <- Arthropoda %>%
+  filter(Family == "Maxillopoda") %>%
+  summarise(Maxillopoda_Relative_Abundance = sum(Relative_Abundance, na.rm = TRUE)) %>%
+  pull()
+
+# Calculate the total relative abundance for comparison
+total_abundance <- Arthropoda %>%
+  summarise(Total_Relative_Abundance = sum(Relative_Abundance, na.rm = TRUE)) %>%
+  pull()
+
+# Calculate the percentage
+percentage_maxillopoda <- (maxillopoda_abundance / total_abundance) * 100
+
+# Print the result
+percentage_maxillopoda
+```
+
+```{r Calculate the % unique reads from maxillopoda}
+library(dplyr)
+
+# Calculate the number of unique ASVs for Maxillopoda
+maxillopoda_asvs <- Arthropoda %>%
+  filter(Family == "Maxillopoda") %>%
+  summarise(Unique_Maxillopoda_ASVs = n_distinct(ASV)) %>%
+  pull()
+
+# Calculate the total number of unique ASVs in the dataset
+total_asvs <- Arthropoda %>%
+  summarise(Total_Unique_ASVs = n_distinct(ASV)) %>%
+  pull()
+
+# Calculate the percentage
+percentage_maxillopoda_asvs <- (maxillopoda_asvs / total_asvs) * 100
+
+# Print the result
+percentage_maxillopoda_asvs
+```
